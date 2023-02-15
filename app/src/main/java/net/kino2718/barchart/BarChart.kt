@@ -1,10 +1,14 @@
 package net.kino2718.barchart
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.gestures.stopScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -34,6 +38,9 @@ fun <T> BarChart(
     BoxWithConstraints(modifier = modifier) {
         // 文字列のサイズの計測器を準備する
         val textMeasurer = rememberTextMeasurer()
+
+        // scroll値。最大値 0。スクロールするほど負の方向に行く
+        var scrollOffset by remember { mutableStateOf(0f) }
 
         // データラベルを計測する
         val dataLabelLayoutResults =
@@ -114,7 +121,29 @@ fun <T> BarChart(
             bottom = gridLineArea.bottom
         )
 
-        Canvas(Modifier.fillMaxSize()) {
+        // 全データのbarを描画するのに必要な幅を計算する
+        val barInterval = with(LocalDensity.current) { attributes.barInterval.toPx() }
+        val totalDataWidth = barInterval * data.size
+        // スクロールが行き過ぎないよう、最小のスクロール値（負の値。絶対値としては最大）を制限する
+        val minOffset = min(plotArea.width - totalDataWidth, 0f)
+        // Canvasからスクロールの状態を取得するstate
+        val scrollableState = rememberScrollableState { delta ->
+            scrollOffset = max(min(scrollOffset + delta, 0f), minOffset)
+            delta
+        }
+        // スクロールが端に達したらスクロールを停止する
+        LaunchedEffect(key1 = scrollOffset) {
+            if (scrollOffset == 0f || scrollOffset == minOffset) scrollableState.stopScroll()
+        }
+
+        Canvas(
+            Modifier
+                .fillMaxSize()
+                .scrollable(
+                    orientation = Orientation.Horizontal,
+                    state = scrollableState
+                )
+        ) {
             // x,y軸を描画する
             drawAxis(area = axisArea, attributes = attributes)
 
@@ -127,6 +156,7 @@ fun <T> BarChart(
                 plotArea = plotArea,
                 dataLabelArea = dataLabelArea,
                 dataValueArea = dataValueArea,
+                offset = scrollOffset,
                 attributes = attributes
             )
 
@@ -253,6 +283,7 @@ private fun <T> DrawScope.drawData(
     plotArea: Rect,
     dataLabelArea: Rect,
     dataValueArea: Rect,
+    offset: Float,
     attributes: BarChartAttributes<T>
 ) where T : Number, T : Comparable<T> {
     val yMin = yAxisAttributes.minValue
@@ -279,7 +310,7 @@ private fun <T> DrawScope.drawData(
             val y = t + b
             val barTop = min(y, b)
             val barHeight = abs(t)
-            val barLeft = xStart + barInterval * index
+            val barLeft = xStart + barInterval * index + offset
             drawRect(
                 color = attributes.barColor,
                 topLeft = Offset(x = barLeft, y = barTop),
@@ -426,5 +457,20 @@ private fun BarChartPreview5() {
             .fillMaxSize()
             .padding(16.dp),
         attributes = BarChartAttributes(gridValueFormatPattern = ",##0円"),
+    )
+}
+
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+private fun BarChartPreview6() {
+    val data = mutableListOf<Datum<Int>>()
+    repeat(100) {
+        data.add(Datum(it + 1, "d${it + 1}"))
+    }
+    BarChart(
+        data = data,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
     )
 }
