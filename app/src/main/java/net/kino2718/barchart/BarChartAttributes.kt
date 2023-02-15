@@ -18,5 +18,8 @@ data class BarChartAttributes<T>(
     val gridLineColor: Color = Color(0x6000_0000),
     val gridValueTextColor: Color = Color(0xdd00_0000),
     val gridValueTextSize: TextUnit = 12.sp,
-    val gridValueFormatPattern: String? = null
+    val gridValueFormatPattern: String? = null,
+    val dataValueTextColor: Color = Color(0xdd00_0000),
+    val dataValueTextSize: TextUnit = 12.sp,
+    val dataValueFormatPattern: String? = null
 ) where T : Number, T : Comparable<T>

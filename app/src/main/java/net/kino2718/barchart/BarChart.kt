@@ -57,6 +57,14 @@ fun <T> BarChart(
             it.size.width
         } ?: 0
 
+        // データ値を表す文字列を計測する
+        val dataValueLayoutResults =
+            measureDataValue(data = data, attributes = attributes, textMeasurer = textMeasurer)
+        // データ値を表す文字列の最大の高さを取得する
+        val maxDataValueHeight = dataValueLayoutResults.maxOfOrNull {
+            it.size.height
+        } ?: 0
+
         // x,y軸の描画エリアを設定する
         val width = with(LocalDensity.current) { maxWidth.toPx() }
         val height = with(LocalDensity.current) { maxHeight.toPx() }
@@ -69,15 +77,29 @@ fun <T> BarChart(
         )
 
         // データの描画エリアを設定する
+        val posDataValueSpace =
+            data.find { 0f <= it.value.toFloat() }?.run { maxDataValueHeight } ?: 0
+        val negDataValueSpace =
+            data.find { it.value.toFloat() < 0f }?.run { maxDataValueHeight } ?: 0
         val plotArea = Rect(
-            left = axisArea.left, top = axisArea.top, right = axisArea.right,
-            bottom = axisArea.bottom
+            left = axisArea.left,
+            top = axisArea.top + posDataValueSpace,
+            right = axisArea.right,
+            bottom = axisArea.bottom - negDataValueSpace
         )
 
         // データラベルの描画エリアを設定する
         val dataLabelArea = Rect(
-            left = plotArea.left, top = plotArea.bottom, right = plotArea.right,
-            bottom = plotArea.bottom + maxDataLabelHeight
+            left = axisArea.left, top = axisArea.bottom, right = axisArea.right,
+            bottom = axisArea.bottom + maxDataLabelHeight
+        )
+
+        // データ値の描画エリアを設定する
+        val dataValueArea = Rect(
+            left = axisArea.left,
+            top = axisArea.top,
+            right = axisArea.right,
+            bottom = axisArea.bottom
         )
 
         // グリッド線の描画エリアを設定する
@@ -100,9 +122,11 @@ fun <T> BarChart(
             drawData(
                 data = data,
                 dataLabelLayoutResults = dataLabelLayoutResults,
+                dataValueLayoutResults = dataValueLayoutResults,
                 yAxisAttributes = yAxisAttributes,
                 plotArea = plotArea,
                 dataLabelArea = dataLabelArea,
+                dataValueArea = dataValueArea,
                 attributes = attributes
             )
 
@@ -167,6 +191,32 @@ private fun <T> measureGridValue(
     return textLayoutResults
 }
 
+// データ値を表す文字列を計測する
+@OptIn(ExperimentalTextApi::class)
+private fun <T> measureDataValue(
+    data: List<Datum<T>>,
+    attributes: BarChartAttributes<T>,
+    textMeasurer: TextMeasurer
+): List<TextLayoutResult> where T : Number, T : Comparable<T> {
+    val textLayoutResults = mutableListOf<TextLayoutResult>()
+    val formatter = attributes.dataValueFormatPattern?.let {
+        DecimalFormat(it)
+    } ?: NumberFormat.getInstance()
+    data.forEach {
+        val value = formatter.format(it.value)
+        textLayoutResults.add(
+            textMeasurer.measure(
+                text = AnnotatedString(value),
+                style = TextStyle(
+                    color = attributes.dataLabelTextColor,
+                    fontSize = attributes.dataLabelTextSize
+                )
+            )
+        )
+    }
+    return textLayoutResults
+}
+
 // x,y軸を描画する
 private fun <T> DrawScope.drawAxis(
     area: Rect,
@@ -198,9 +248,11 @@ private fun Rect.union(other: Rect): Rect {
 private fun <T> DrawScope.drawData(
     data: List<Datum<T>>,
     dataLabelLayoutResults: List<TextLayoutResult>,
+    dataValueLayoutResults: List<TextLayoutResult>,
     yAxisAttributes: YAxisAttributes,
     plotArea: Rect,
     dataLabelArea: Rect,
+    dataValueArea: Rect,
     attributes: BarChartAttributes<T>
 ) where T : Number, T : Comparable<T> {
     val yMin = yAxisAttributes.minValue
@@ -213,8 +265,8 @@ private fun <T> DrawScope.drawData(
     val barInterval = attributes.barInterval.toPx()
     val barWidth = attributes.barWidth.toPx()
     val xStart = plotArea.left + (barInterval - barWidth) / 2f
-    // clipの範囲をプロット領域とラベル領域の両方を含むようにする
-    val unionArea = plotArea.union(dataLabelArea)
+    // clipの範囲をプロット領域とラベル領域、データ値領域の全てを含むようにする
+    val unionArea = plotArea.union(dataLabelArea).union(dataValueArea)
     clipRect(
         left = unionArea.left,
         top = unionArea.top,
@@ -244,6 +296,15 @@ private fun <T> DrawScope.drawData(
                 topLeft = Offset(labelLeft, labelTop)
             )
 
+            // データ値の描画
+            val valueLayoutResult = dataValueLayoutResults[index]
+            val valueLeft = barLeft + (barWidth - valueLayoutResult.size.width) / 2
+            val valueTop = if (0f <= datum.value.toFloat()) barTop - valueLayoutResult.size.height
+            else barTop + barHeight
+            drawText(
+                textLayoutResult = valueLayoutResult,
+                topLeft = Offset(valueLeft, valueTop)
+            )
         }
     }
 }
