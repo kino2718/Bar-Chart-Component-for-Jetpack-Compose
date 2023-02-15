@@ -15,6 +15,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             BarChartTheme {
                 BarChart(
+                    data = listOf(
+                        Datum(1, "d1"),
+                        Datum(2, "d2"),
+                        Datum(3, "d3"),
+                        Datum(4, "d4"),
+                        Datum(5, "d5"),
+                        Datum(6, "d6")
+                    ),
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp)
