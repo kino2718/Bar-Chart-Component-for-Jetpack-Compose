@@ -15,9 +15,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.*
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import java.text.DecimalFormat
+import java.text.NumberFormat
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+
+// grid値の文字列とy軸の間のpadding
+private val PADDING = 8.dp
 
 @OptIn(ExperimentalTextApi::class)
 @Composable
@@ -38,11 +43,28 @@ fun <T> BarChart(
             it.size.height
         } ?: 0
 
+        // y軸の範囲とgridを求める
+        val yAxisAttributes = makeYAxisAttributes(data = data, attributes = attributes)
+
+        // grid値を表す文字列を計測する
+        val gridValueLayoutResults = measureGridValue(
+            yAxisAttributes = yAxisAttributes,
+            attributes = attributes,
+            textMeasurer = textMeasurer
+        )
+        // Grid値の最大の幅を取得する
+        val maxGridValueWidth = gridValueLayoutResults.maxOfOrNull {
+            it.size.width
+        } ?: 0
+
         // x,y軸の描画エリアを設定する
         val width = with(LocalDensity.current) { maxWidth.toPx() }
         val height = with(LocalDensity.current) { maxHeight.toPx() }
+        val padding = with(LocalDensity.current) { PADDING.toPx() }
         val axisArea = Rect(
-            left = 0f, top = 0f, right = width,
+            left = maxGridValueWidth.toFloat() + padding, // grid値表示分、軸の位置をずらす
+            top = 0f,
+            right = width,
             bottom = height - maxDataLabelHeight // データラベル分、軸の位置をずらす
         )
 
@@ -58,8 +80,17 @@ fun <T> BarChart(
             bottom = plotArea.bottom + maxDataLabelHeight
         )
 
-        // y軸の範囲を求める
-        val yAxisAttributes = makeYAxisAttributes(data = data, attributes = attributes)
+        // グリッド線の描画エリアを設定する
+        val gridLineArea = Rect(
+            left = plotArea.left, top = plotArea.top, right = plotArea.right,
+            bottom = plotArea.bottom
+        )
+
+        // グリッド値の描画エリアを設定する
+        val gridValueArea = Rect(
+            left = 0f, top = gridLineArea.top, right = gridLineArea.left - padding,
+            bottom = gridLineArea.bottom
+        )
 
         Canvas(Modifier.fillMaxSize()) {
             // x,y軸を描画する
@@ -72,6 +103,15 @@ fun <T> BarChart(
                 yAxisAttributes = yAxisAttributes,
                 plotArea = plotArea,
                 dataLabelArea = dataLabelArea,
+                attributes = attributes
+            )
+
+            // grid値とgrid線を描画する
+            drawGrid(
+                yAxisAttributes = yAxisAttributes,
+                gridValueLayoutResults = gridValueLayoutResults,
+                gridLineArea = gridLineArea,
+                gridValueArea = gridValueArea,
                 attributes = attributes
             )
         }
@@ -94,6 +134,32 @@ private fun <T> measureDataLabel(
                 style = TextStyle(
                     color = attributes.dataLabelTextColor,
                     fontSize = attributes.dataLabelTextSize
+                )
+            )
+        )
+    }
+    return textLayoutResults
+}
+
+// grid値を表す文字列を計測する
+@OptIn(ExperimentalTextApi::class)
+private fun <T> measureGridValue(
+    yAxisAttributes: YAxisAttributes,
+    attributes: BarChartAttributes<T>,
+    textMeasurer: TextMeasurer
+): List<TextLayoutResult> where T : Number, T : Comparable<T> {
+    val textLayoutResults = mutableListOf<TextLayoutResult>()
+    val formatter = attributes.gridValueFormatPattern?.let {
+        DecimalFormat(it)
+    } ?: NumberFormat.getInstance()
+    yAxisAttributes.gridList.forEach {
+        val label = formatter.format(it)
+        textLayoutResults.add(
+            textMeasurer.measure(
+                text = AnnotatedString(label),
+                style = TextStyle(
+                    color = attributes.gridValueTextColor,
+                    fontSize = attributes.gridValueTextSize
                 )
             )
         )
@@ -182,6 +248,42 @@ private fun <T> DrawScope.drawData(
     }
 }
 
+// grid値とgrid線を描画する
+@OptIn(ExperimentalTextApi::class)
+private fun <T> DrawScope.drawGrid(
+    yAxisAttributes: YAxisAttributes,
+    gridValueLayoutResults: List<TextLayoutResult>,
+    gridLineArea: Rect,
+    gridValueArea: Rect,
+    attributes: BarChartAttributes<T>
+) where T : Number, T : Comparable<T> {
+    val yMin = yAxisAttributes.minValue
+    val yMax = yAxisAttributes.maxValue
+
+    // データ値を座標に変換する係数を計算 y = ax + b
+    val yRange = yMax - yMin
+    val a = (gridLineArea.top - gridLineArea.bottom) / yRange
+    val b = (gridLineArea.bottom * yMax - gridLineArea.top * yMin) / yRange
+
+    yAxisAttributes.gridList.forEachIndexed { index, gridValue ->
+        val y = a * gridValue + b
+        // grid線を描画する
+        drawLine(
+            color = attributes.gridLineColor,
+            start = Offset(x = gridLineArea.left, y = y),
+            end = Offset(x = gridLineArea.right, y = y)
+        )
+        // grid値を描画する
+        val valueSize = gridValueLayoutResults[index].size
+        val valueLeft = gridValueArea.right - valueSize.width
+        val valueTop = y - valueSize.height / 2
+        drawText(
+            textLayoutResult = gridValueLayoutResults[index],
+            topLeft = Offset(x = valueLeft, y = valueTop)
+        )
+    }
+}
+
 @Preview(widthDp = 400, heightDp = 400)
 @Composable
 private fun BarChartPreview1() {
@@ -226,5 +328,42 @@ private fun BarChartPreview3() {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+    )
+}
+
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+private fun BarChartPreview4() {
+    BarChart(
+        data = listOf(
+            Datum(1000000, "d1"),
+            Datum(-2000000, "d2"),
+            Datum(3000000, "d3"),
+            Datum(-4000000, "d4"),
+            Datum(5000000, "d5"),
+            Datum(-6000000, "d6")
+        ),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    )
+}
+
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+private fun BarChartPreview5() {
+    BarChart(
+        data = listOf(
+            Datum(1000000, "d1"),
+            Datum(2000000, "d2"),
+            Datum(3000000, "d3"),
+            Datum(4000000, "d4"),
+            Datum(5000000, "d5"),
+            Datum(6000000, "d6")
+        ),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        attributes = BarChartAttributes(gridValueFormatPattern = ",##0円"),
     )
 }

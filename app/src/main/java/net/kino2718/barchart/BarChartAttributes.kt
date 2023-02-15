@@ -14,5 +14,9 @@ data class BarChartAttributes<T>(
     val barColor: Color = Color(0xFF3F_51B5),
     val axisLineColor: Color = Color(0x6000_0000),
     val dataLabelTextColor: Color = Color(0xdd00_0000),
-    val dataLabelTextSize: TextUnit = 12.sp
+    val dataLabelTextSize: TextUnit = 12.sp,
+    val gridLineColor: Color = Color(0x6000_0000),
+    val gridValueTextColor: Color = Color(0xdd00_0000),
+    val gridValueTextSize: TextUnit = 12.sp,
+    val gridValueFormatPattern: String? = null
 ) where T : Number, T : Comparable<T>
