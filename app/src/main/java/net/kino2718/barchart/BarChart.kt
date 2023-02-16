@@ -22,11 +22,15 @@ import androidx.compose.ui.unit.dp
 import java.text.DecimalFormat
 import java.text.NumberFormat
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 
 // grid値の文字列とy軸の間のpadding
 private val PADDING = 8.dp
+
+// 表示されているデータのインデックスを保持するクラス
+private data class DisplayedDataRange(val fromIndex: Int, val toIndex: Int)
 
 @OptIn(ExperimentalTextApi::class)
 @Composable
@@ -39,8 +43,24 @@ fun <T> BarChart(
         // 文字列のサイズの計測器を準備する
         val textMeasurer = rememberTextMeasurer()
 
+        // 描画領域のサイズ
+        val width = with(LocalDensity.current) { maxWidth.toPx() }
+        val height = with(LocalDensity.current) { maxHeight.toPx() }
+
         // scroll値。最大値 0。スクロールするほど負の方向に行く
         var scrollOffset by remember { mutableStateOf(0f) }
+
+        // 表示されるデータの範囲をインデックスで取得する
+        val barInterval = with(LocalDensity.current) { attributes.barInterval.toPx() }
+        val displayedDataRange = getDisplayedDataRange(
+            scrollOffset = scrollOffset,
+            dataNum = data.size,
+            plotAreaWidth = width,
+            barInterval = barInterval
+        )
+
+        // 表示されるデータを取得
+        val displayedData = data.subList(displayedDataRange.fromIndex, displayedDataRange.toIndex)
 
         // データラベルを計測する
         val dataLabelLayoutResults =
@@ -50,8 +70,13 @@ fun <T> BarChart(
             it.size.height
         } ?: 0
 
+        // 現在scrollしているかを示すフラグ
+        var isScrollInProgress by remember { mutableStateOf(false) }
+
         // y軸の範囲とgridを求める
-        val yAxisAttributes = makeYAxisAttributes(data = data, attributes = attributes)
+        val yAxisAttributes = remember(key1 = isScrollInProgress) {
+            makeYAxisAttributes(data = displayedData, attributes = attributes)
+        }
 
         // grid値を表す文字列を計測する
         val gridValueLayoutResults = measureGridValue(
@@ -73,8 +98,6 @@ fun <T> BarChart(
         } ?: 0
 
         // x,y軸の描画エリアを設定する
-        val width = with(LocalDensity.current) { maxWidth.toPx() }
-        val height = with(LocalDensity.current) { maxHeight.toPx() }
         val padding = with(LocalDensity.current) { PADDING.toPx() }
         val axisArea = Rect(
             left = maxGridValueWidth.toFloat() + padding, // grid値表示分、軸の位置をずらす
@@ -122,7 +145,6 @@ fun <T> BarChart(
         )
 
         // 全データのbarを描画するのに必要な幅を計算する
-        val barInterval = with(LocalDensity.current) { attributes.barInterval.toPx() }
         val totalDataWidth = barInterval * data.size
         // スクロールが行き過ぎないよう、最小のスクロール値（負の値。絶対値としては最大）を制限する
         val minOffset = min(plotArea.width - totalDataWidth, 0f)
@@ -135,6 +157,8 @@ fun <T> BarChart(
         LaunchedEffect(key1 = scrollOffset) {
             if (scrollOffset == 0f || scrollOffset == minOffset) scrollableState.stopScroll()
         }
+        // スクロール中かどうかをStateに保存する
+        isScrollInProgress = scrollableState.isScrollInProgress
 
         Canvas(
             Modifier
@@ -170,6 +194,19 @@ fun <T> BarChart(
             )
         }
     }
+}
+
+// 表示されるデータの範囲をインデックスで取得する
+private fun getDisplayedDataRange(
+    scrollOffset: Float,
+    dataNum: Int,
+    plotAreaWidth: Float,
+    barInterval: Float
+): DisplayedDataRange {
+    val fromIndex = max(0, (-scrollOffset / barInterval).toInt())
+    val toIndex =
+        min(dataNum, fromIndex + ceil(plotAreaWidth / barInterval).toInt() + 1)
+    return DisplayedDataRange(fromIndex, toIndex)
 }
 
 // データラベルを計測する
@@ -472,5 +509,21 @@ private fun BarChartPreview6() {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+    )
+}
+
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+private fun BarChartPreview7() {
+    val data = mutableListOf<Datum<Int>>()
+    repeat(100) {
+        data.add(Datum(it + 1, "d${it + 1}"))
+    }
+    BarChart(
+        data = data,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        attributes = BarChartAttributes(yMin = 0, yMax = 50)
     )
 }
