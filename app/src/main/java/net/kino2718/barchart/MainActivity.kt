@@ -14,7 +14,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             val data = mutableListOf<Datum<Int>>()
-            repeat(100) {
+            repeat(10000) {
                 data.add(Datum(it + 1, "d${it + 1}"))
             }
             BarChartTheme {

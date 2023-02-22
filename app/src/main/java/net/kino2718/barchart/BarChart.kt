@@ -67,7 +67,11 @@ fun <T> BarChart(
 
         // データラベルを計測する
         val dataLabelLayoutResults =
-            measureDataLabel(data = data, attributes = attributes, textMeasurer = textMeasurer)
+            measureDataLabel(
+                data = displayedData,
+                attributes = attributes,
+                textMeasurer = textMeasurer
+            )
         // データラベルの最大の高さを取得する
         val maxDataLabelHeight = dataLabelLayoutResults.maxOfOrNull {
             it.size.height
@@ -115,7 +119,11 @@ fun <T> BarChart(
 
         // データ値を表す文字列を計測する
         val dataValueLayoutResults =
-            measureDataValue(data = data, attributes = attributes, textMeasurer = textMeasurer)
+            measureDataValue(
+                data = displayedData,
+                attributes = attributes,
+                textMeasurer = textMeasurer
+            )
         // データ値を表す文字列の最大の高さを取得する
         val maxDataValueHeight = dataValueLayoutResults.maxOfOrNull {
             it.size.height
@@ -132,9 +140,9 @@ fun <T> BarChart(
 
         // データの描画エリアを設定する
         val posDataValueSpace =
-            data.find { 0f <= it.value.toFloat() }?.run { maxDataValueHeight } ?: 0
+            displayedData.find { 0f <= it.value.toFloat() }?.run { maxDataValueHeight } ?: 0
         val negDataValueSpace =
-            data.find { it.value.toFloat() < 0f }?.run { maxDataValueHeight } ?: 0
+            displayedData.find { it.value.toFloat() < 0f }?.run { maxDataValueHeight } ?: 0
         val plotArea = Rect(
             left = axisArea.left,
             top = axisArea.top + posDataValueSpace,
@@ -196,15 +204,16 @@ fun <T> BarChart(
             drawAxis(area = axisArea, attributes = attributes)
 
             // データを描画する
+            val offset = scrollOffset + displayedDataRange.fromIndex * barInterval
             drawData(
-                data = data,
+                data = displayedData,
                 dataLabelLayoutResults = dataLabelLayoutResults,
                 dataValueLayoutResults = dataValueLayoutResults,
                 yAxisAttributes = yAxisAttributes,
                 plotArea = plotArea,
                 dataLabelArea = dataLabelArea,
                 dataValueArea = dataValueArea,
-                offset = scrollOffset,
+                offset = offset,
                 attributes = attributes
             )
 
@@ -541,6 +550,22 @@ private fun BarChartPreview6() {
 private fun BarChartPreview7() {
     val data = mutableListOf<Datum<Int>>()
     repeat(100) {
+        data.add(Datum(it + 1, "d${it + 1}"))
+    }
+    BarChart(
+        data = data,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        attributes = BarChartAttributes(yMin = 0, yMax = 50)
+    )
+}
+
+@Preview(widthDp = 400, heightDp = 400)
+@Composable
+private fun BarChartPreview8() {
+    val data = mutableListOf<Datum<Int>>()
+    repeat(10000) {
         data.add(Datum(it + 1, "d${it + 1}"))
     }
     BarChart(
