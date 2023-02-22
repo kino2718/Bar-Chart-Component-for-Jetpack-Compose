@@ -3,13 +3,14 @@ package net.kino2718.barchart
 import kotlin.math.max
 import kotlin.math.min
 
+data class YAxisRange(val minValue: Float, val maxValue: Float)
+
 data class YAxisAttributes(val minValue: Float, val maxValue: Float, val gridList: List<Float>)
 
-fun <T> makeYAxisAttributes(
+fun <T> makeYAxisRange(
     data: List<Datum<T>> = emptyList(),
-    attributes: BarChartAttributes<T> = BarChartAttributes(),
-    gridCount: Float = 7f // 目標とするgrid線の数。実際にはこれより小さくなる
-): YAxisAttributes where T : Number, T : Comparable<T> {
+    attributes: BarChartAttributes<T> = BarChartAttributes()
+): YAxisRange where T : Number, T : Comparable<T> {
     // チャートのy軸の範囲を決める
     val yMinOrNull = attributes.yMin ?: run { data.minOfOrNull { it.value } }
     val yMin = yMinOrNull?.toFloat() ?: 0f
@@ -19,6 +20,16 @@ fun <T> makeYAxisAttributes(
     // 棒グラフのためy軸の範囲には必ず0を含むようにする
     val minValue = min(0f, yMin)
     val maxValue = max(0f, yMax)
+
+    return YAxisRange(minValue, maxValue)
+}
+
+fun makeYAxisAttributes(
+    yAxisRange: YAxisRange,
+    gridCount: Float = 6f // 目標とするgrid間隔の数。実際にはこれより小さくなる
+): YAxisAttributes {
+    val minValue = yAxisRange.minValue
+    val maxValue = yAxisRange.maxValue
 
     val range = maxValue - minValue
     // 範囲が0だとグラフは書けないので(0,1)の範囲に変更する

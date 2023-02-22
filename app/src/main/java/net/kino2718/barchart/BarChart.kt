@@ -1,5 +1,8 @@
 package net.kino2718.barchart
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector2D
+import androidx.compose.animation.core.TwoWayConverter
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.rememberScrollableState
@@ -70,13 +73,34 @@ fun <T> BarChart(
             it.size.height
         } ?: 0
 
+        // y軸の範囲とgridを求める
+        val yAxisRange = makeYAxisRange(data = displayedData, attributes = attributes)
+        // y軸の範囲をアニメーション化する
+        val animatedYAxisRange = remember {
+            Animatable(
+                initialValue = yAxisRange,
+                typeConverter = TwoWayConverter(
+                    convertToVector = {
+                        AnimationVector2D(it.minValue, it.maxValue)
+                    }, convertFromVector = {
+                        YAxisRange(it.v1, it.v2)
+                    })
+            )
+        }
+
         // 現在scrollしているかを示すフラグ
         var isScrollInProgress by remember { mutableStateOf(false) }
 
-        // y軸の範囲とgridを求める
-        val yAxisAttributes = remember(key1 = isScrollInProgress) {
-            makeYAxisAttributes(data = displayedData, attributes = attributes)
+        // スクロールが終了したらy軸の範囲を変更するアニメーションを開始する
+        LaunchedEffect(key1 = isScrollInProgress) {
+            animatedYAxisRange.animateTo(
+                targetValue = yAxisRange
+            )
         }
+
+        // y軸の範囲とgridを求める
+        val yAxisAttributes = makeYAxisAttributes(yAxisRange = animatedYAxisRange.value)
+
 
         // grid値を表す文字列を計測する
         val gridValueLayoutResults = measureGridValue(
