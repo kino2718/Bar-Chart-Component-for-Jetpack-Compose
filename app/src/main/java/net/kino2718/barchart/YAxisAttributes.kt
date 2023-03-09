@@ -12,9 +12,9 @@ fun <T> makeYAxisRange(
     attributes: BarChartAttributes<T> = BarChartAttributes()
 ): YAxisRange where T : Number, T : Comparable<T> {
     // チャートのy軸の範囲を決める
-    val yMinOrNull = attributes.yMin ?: run { data.minOfOrNull { it.value } }
+    val yMinOrNull = attributes.yMin ?: data.minOfOrNull { it.value }
     val yMin = yMinOrNull?.toFloat() ?: 0f
-    val yMaxOrNull = attributes.yMax ?: run { data.maxOfOrNull { it.value } }
+    val yMaxOrNull = attributes.yMax ?: data.maxOfOrNull { it.value }
     val yMax = yMaxOrNull?.toFloat() ?: 0f
 
     // 棒グラフのためy軸の範囲には必ず0を含むようにする
